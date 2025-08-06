@@ -1,29 +1,57 @@
 
+import { db } from '../db';
+import { applicationsTable } from '../db/schema';
 import { type GetApplicationsInput, type Application } from '../schema';
+import { eq, ilike, and, desc, SQL } from 'drizzle-orm';
 
 export const getApplications = async (input: GetApplicationsInput): Promise<Application[]> => {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is fetching applications with filtering, searching, and pagination.
-  // This will support filtering by category, featured status, free/paid, and text search.
-  // It should also support pagination using limit and offset parameters.
-  return Promise.resolve([
-    {
-      id: 1,
-      name: 'Sample App',
-      slug: 'sample-app',
-      description: 'A sample application for testing',
-      short_description: 'Sample app',
-      developer_id: 1,
-      category_id: 1,
-      price: 9.99,
-      is_free: false,
-      is_featured: true,
-      rating: 4.5,
-      download_count: 1000,
-      app_icon_url: null,
-      status: 'published' as const,
-      created_at: new Date(),
-      updated_at: new Date()
+  try {
+    // Build conditions array for filtering
+    const conditions: SQL<unknown>[] = [];
+
+    // Filter by category
+    if (input.category_id !== undefined) {
+      conditions.push(eq(applicationsTable.category_id, input.category_id));
     }
-  ] as Application[]);
+
+    // Filter by featured status
+    if (input.is_featured !== undefined) {
+      conditions.push(eq(applicationsTable.is_featured, input.is_featured));
+    }
+
+    // Filter by free/paid status
+    if (input.is_free !== undefined) {
+      conditions.push(eq(applicationsTable.is_free, input.is_free));
+    }
+
+    // Only show published applications
+    conditions.push(eq(applicationsTable.status, 'published'));
+
+    // Text search across name and description
+    if (input.search) {
+      const searchTerm = `%${input.search}%`;
+      conditions.push(
+        ilike(applicationsTable.name, searchTerm)
+      );
+    }
+
+    // Build and execute the query in one go
+    const results = await db.select()
+      .from(applicationsTable)
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      .orderBy(desc(applicationsTable.is_featured), desc(applicationsTable.created_at))
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute();
+
+    // Convert numeric fields back to numbers
+    return results.map(app => ({
+      ...app,
+      price: parseFloat(app.price),
+      rating: app.rating ? parseFloat(app.rating) : null
+    }));
+  } catch (error) {
+    console.error('Applications query failed:', error);
+    throw error;
+  }
 };

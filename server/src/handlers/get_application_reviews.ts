@@ -1,29 +1,28 @@
 
+import { db } from '../db';
+import { reviewsTable, usersTable } from '../db/schema';
+import { eq, desc } from 'drizzle-orm';
 import { type Review } from '../schema';
 
 export const getApplicationReviews = async (applicationId: number): Promise<Review[]> => {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is fetching all reviews for a specific application.
-  // This will be used on the application detail page to show user feedback
-  // and ratings to help potential buyers make decisions.
-  return Promise.resolve([
-    {
-      id: 1,
-      application_id: applicationId,
-      user_id: 1,
-      rating: 5,
-      comment: 'Great app! Very useful and well designed.',
-      created_at: new Date(),
-      updated_at: new Date()
-    },
-    {
-      id: 2,
-      application_id: applicationId,
-      user_id: 2,
-      rating: 4,
-      comment: 'Good app, but could use some improvements.',
-      created_at: new Date(),
-      updated_at: new Date()
-    }
-  ] as Review[]);
+  try {
+    const results = await db.select()
+      .from(reviewsTable)
+      .where(eq(reviewsTable.application_id, applicationId))
+      .orderBy(desc(reviewsTable.created_at))
+      .execute();
+
+    return results.map(review => ({
+      id: review.id,
+      application_id: review.application_id,
+      user_id: review.user_id,
+      rating: review.rating,
+      comment: review.comment,
+      created_at: review.created_at,
+      updated_at: review.updated_at
+    }));
+  } catch (error) {
+    console.error('Failed to get application reviews:', error);
+    throw error;
+  }
 };

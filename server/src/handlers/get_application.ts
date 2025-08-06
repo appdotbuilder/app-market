@@ -1,27 +1,43 @@
 
+import { db } from '../db';
+import { applicationsTable } from '../db/schema';
 import { type GetApplicationInput, type Application } from '../schema';
+import { eq, or } from 'drizzle-orm';
 
 export const getApplication = async (input: GetApplicationInput): Promise<Application | null> => {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is fetching a single application by ID or slug.
-  // This will be used for the application detail page, including full description,
-  // screenshots, reviews, and all relevant information for potential buyers.
-  return Promise.resolve({
-    id: 1,
-    name: 'Sample App',
-    slug: 'sample-app',
-    description: 'A detailed description of the sample application with all features and benefits.',
-    short_description: 'Sample app for testing',
-    developer_id: 1,
-    category_id: 1,
-    price: 9.99,
-    is_free: false,
-    is_featured: true,
-    rating: 4.5,
-    download_count: 1000,
-    app_icon_url: null,
-    status: 'published' as const,
-    created_at: new Date(),
-    updated_at: new Date()
-  } as Application);
+  try {
+    // Build conditions based on input
+    const conditions = [];
+    
+    if (input.id) {
+      conditions.push(eq(applicationsTable.id, input.id));
+    }
+    
+    if (input.slug) {
+      conditions.push(eq(applicationsTable.slug, input.slug));
+    }
+
+    // Execute query with OR condition if both ID and slug are provided
+    const result = await db.select()
+      .from(applicationsTable)
+      .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+      .limit(1)
+      .execute();
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    const application = result[0];
+
+    // Convert numeric fields back to numbers
+    return {
+      ...application,
+      price: parseFloat(application.price),
+      rating: application.rating ? parseFloat(application.rating) : null
+    };
+  } catch (error) {
+    console.error('Application fetch failed:', error);
+    throw error;
+  }
 };
